@@ -15,6 +15,7 @@ import {
   type Route,
   type RoutingProfile,
 } from "../src/index";
+import { readSharedRoute, writeSharedRoute } from "./route-url";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const darkInput = $<HTMLInputElement>("dark");
@@ -135,6 +136,7 @@ let lastRoutes: Route[] = [];
 let selectedRouteIndex = 0;
 let fromMarker: maplibregl.Marker | undefined;
 let toMarker: maplibregl.Marker | undefined;
+let routePendingAfterStyleLoad = false;
 
 function applyBuildingNamesVisibility() {
   if (map) setBuildingLabelsVisible(map, buildingNamesInput.checked);
@@ -192,13 +194,40 @@ function renderRouteList(profile: RoutingProfile) {
       selectedRouteIndex = i;
       applyRouteLayer();
       renderRouteList(profile);
+      updateRouteUrl();
     });
     routeInfoEl.appendChild(option);
   });
 }
 
-function getDirections() {
+function selectedProfile(): RoutingProfile {
+  return (document.querySelector('input[name="profile"]:checked') as HTMLInputElement).value as RoutingProfile;
+}
+
+function updateRouteUrl() {
+  const url = writeSharedRoute(new URL(window.location.href), {
+    from: fromInput.value.trim(),
+    to: toInput.value.trim(),
+    profile: selectedProfile(),
+    routeIndex: selectedRouteIndex,
+  });
+  window.history.pushState(null, "", url);
+}
+
+function loadDirectionsFromUrl(): boolean {
+  const route = readSharedRoute(new URL(window.location.href));
+  if (!route) return false;
+
+  fromInput.value = route.from;
+  toInput.value = route.to;
+  document.querySelector<HTMLInputElement>(`input[name="profile"][value="${route.profile}"]`)!.checked = true;
+  selectedRouteIndex = route.routeIndex;
+  return true;
+}
+
+function getDirections(updateUrl = true) {
   if (!map) return;
+  if (updateUrl) selectedRouteIndex = 0;
   routeInfoEl.innerHTML = "";
   errorEl.textContent = "";
 
@@ -213,7 +242,7 @@ function getDirections() {
     return;
   }
 
-  const profile = (document.querySelector('input[name="profile"]:checked') as HTMLInputElement).value as RoutingProfile;
+  const profile = selectedProfile();
   const routes = findRoutes(from, to, profile, 3);
   if (routes.length === 0) {
     lastRoutes = [];
@@ -222,9 +251,10 @@ function getDirections() {
   }
 
   lastRoutes = routes;
-  selectedRouteIndex = 0;
+  selectedRouteIndex = Math.min(selectedRouteIndex, routes.length - 1);
   applyRouteLayer();
   renderRouteList(profile);
+  if (updateUrl) updateRouteUrl();
 
   fromMarker?.remove();
   toMarker?.remove();
@@ -260,8 +290,15 @@ function render() {
         fitBoundsOptions: { padding: 24 },
       });
       // `setStyle()` replaces layers, so restore the checkbox state and route on every load.
-      map.on("style.load", applyBuildingNamesVisibility);
-      map.on("style.load", applyRouteLayer);
+      map.on("style.load", () => {
+        applyBuildingNamesVisibility();
+        if (routePendingAfterStyleLoad) {
+          routePendingAfterStyleLoad = false;
+          getDirections(false);
+        } else {
+          applyRouteLayer();
+        }
+      });
       map.on("error", (e) => {
         errorEl.textContent = "Map error: " + (e.error?.message ?? String(e));
       });
@@ -287,6 +324,26 @@ $("useLocation").addEventListener("click", () => {
     },
   );
 });
-$("getDirections").addEventListener("click", getDirections);
+$("getDirections").addEventListener("click", () => getDirections());
+
+window.addEventListener("popstate", () => {
+  if (!loadDirectionsFromUrl()) {
+    lastRoutes = [];
+    routeInfoEl.innerHTML = "";
+    if (map?.getSource(ROUTE_SOURCE_ID)) {
+      (map.getSource(ROUTE_SOURCE_ID) as maplibregl.GeoJSONSource).setData({
+        type: "FeatureCollection",
+        features: [],
+      });
+    }
+    fromMarker?.remove();
+    toMarker?.remove();
+    return;
+  }
+  if (map?.isStyleLoaded()) getDirections(false);
+  else routePendingAfterStyleLoad = true;
+});
+
+routePendingAfterStyleLoad = loadDirectionsFromUrl();
 
 render();
