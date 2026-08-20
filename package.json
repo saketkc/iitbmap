@@ -1,0 +1,39 @@
+{
+  "name": "iitbmap",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "MapLibre GL JS style and geo data for the IIT Bombay campus map, light + dark, framework-agnostic",
+  "keywords": ["maplibre", "maplibre-gl", "map", "geojson", "vector-tiles", "iit-bombay", "iitb", "campus-map"],
+  "license": "MIT",
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "demo": "vite --config vite.demo.config.ts",
+    "demo:build": "vite build --config vite.demo.config.ts"
+  },
+  "peerDependencies": {
+    "maplibre-gl": "^4.7.1"
+  },
+  "devDependencies": {
+    "@types/geojson": "^7946.0.14",
+    "maplibre-gl": "^4.7.1",
+    "tsup": "^8.3.0",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.11",
+    "vitest": "^2.1.0"
+  }
+}

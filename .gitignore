@@ -1,0 +1,14 @@
+node_modules/
+dist/
+demo/dist/
+*.tsbuildinfo
+.DS_Store
+.claude/
+.cloudflare
+.cloudflare2
+
+# vector tiles are built locally / hosted on R2, not committed. No trailing
+# slash: a trailing-slash pattern only matches real directories, not a
+# symlink (e.g. `ln -s .../public/tiles assets/tiles` for local demo testing).
+tiles
+scripts/geojson/
