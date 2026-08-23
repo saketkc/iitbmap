@@ -1,4 +1,4 @@
-import type { RoutingProfile } from "../src/index";
+import type { RoutingProfile } from "../../../src/index";
 
 export interface SharedRoute {
   from: string;

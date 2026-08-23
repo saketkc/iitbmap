@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://saketkc.github.io/iitbmap/sitemap.xml

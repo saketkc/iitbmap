@@ -12,7 +12,10 @@
     "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
-    "noFallthroughCasesInSwitch": true
+    "noFallthroughCasesInSwitch": true,
+    "jsx": "react-jsx",
+    "baseUrl": ".",
+    "paths": { "@/*": ["./demo/src/*"] }
   },
   "include": ["src", "test", "demo"]
 }

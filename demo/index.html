@@ -1,95 +1,59 @@
 <!doctype html>
 <html lang="en">
 <head>
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-R4HDJYPDV7"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-R4HDJYPDV7');
+  </script>
+
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>iitbmap demo</title>
-  <style>
-    html, body, #map { margin: 0; height: 100%; }
-    #controls {
-      position: absolute; top: 12px; left: 12px; z-index: 1;
-      background: #fff; padding: 14px; border-radius: 10px; color: #1e293b;
-      font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
-      box-shadow: 0 2px 10px rgba(15, 23, 42, .12), 0 0 0 1px rgba(15, 23, 42, .04);
-      display: grid; gap: 8px; width: 300px;
-    }
-    #controls label { display: flex; align-items: center; gap: 6px; }
-    #controls input[type="text"] {
-      width: 100%; box-sizing: border-box; padding: 7px 10px;
-      border: 1px solid #cbd5e1; border-radius: 6px; font: inherit; color: inherit;
-    }
-    #controls input[type="text"]:focus {
-      outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37, 99, 235, .15);
-    }
-    #controls button {
-      font: inherit; padding: 7px 12px; border-radius: 6px;
-      border: 1px solid #cbd5e1; background: #f8fafc; color: inherit; cursor: pointer;
-    }
-    #controls button:hover { background: #f1f5f9; }
-    #getDirections { background: #2563eb; border-color: #2563eb; color: #fff; font-weight: 600; }
-    #getDirections:hover { background: #1d4ed8; }
-    #controls hr { width: 100%; border: none; border-top: 1px solid #e2e8f0; margin: 2px 0; }
-    #directions { display: grid; gap: 8px; }
-    #directions .row { display: flex; gap: 6px; align-items: center; }
-    #directions .row input[type="text"] { flex: 1; }
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>IIT Bombay Campus Map & Directions | iitbmap</title>
+  <meta name="description" content="Interactive IIT Bombay campus map with walking and driving directions between any two buildings. Light and dark themes, installable as an app." />
+  <link rel="canonical" href="https://saketkc.github.io/iitbmap/" />
 
-    .combobox { position: relative; }
-    .combobox-list {
-      position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 2;
-      margin: 0; padding: 4px; list-style: none; max-height: 220px; overflow-y: auto;
-      background: #fff; border: 1px solid #e2e8f0; border-radius: 8px;
-      box-shadow: 0 8px 24px rgba(15, 23, 42, .14);
-    }
-    .combobox-list[hidden] { display: none; }
-    .combobox-option { padding: 7px 10px; border-radius: 5px; cursor: pointer; }
-    .combobox-option mark { background: none; color: #2563eb; font-weight: 600; }
-    .combobox-option.active, .combobox-option:hover { background: #eff6ff; }
-    .combobox-empty { padding: 7px 10px; color: #94a3b8; }
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="IIT Bombay Campus Map & Directions" />
+  <meta property="og:description" content="Interactive IIT Bombay campus map with walking and driving directions between any two buildings." />
+  <meta property="og:url" content="https://saketkc.github.io/iitbmap/" />
+  <meta property="og:image" content="https://saketkc.github.io/iitbmap/icons/icon-512.png" />
+  <meta property="og:site_name" content="iitbmap" />
+  <meta name="twitter:card" content="summary" />
+  <meta name="twitter:title" content="IIT Bombay Campus Map & Directions" />
+  <meta name="twitter:description" content="Interactive IIT Bombay campus map with walking and driving directions between any two buildings." />
+  <meta name="twitter:image" content="https://saketkc.github.io/iitbmap/icons/icon-512.png" />
 
-    #error { color: #b91c1c; white-space: pre-wrap; font-size: 12px; }
-    #routeInfo { display: grid; gap: 4px; }
-    #routeInfo button { display: block; width: 100%; text-align: left; background: #f8fafc; }
-    #routeInfo button:hover { background: #eff6ff; border-color: #bfdbfe; }
-  </style>
+  <meta name="theme-color" content="#2563eb" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="iitbmap" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="icon" type="image/png" href="/icons/favicon-32.png" />
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "iitbmap",
+      "url": "https://saketkc.github.io/iitbmap/",
+      "description": "Interactive IIT Bombay campus map with walking and driving directions between any two buildings.",
+      "applicationCategory": "MapsApplication",
+      "operatingSystem": "Any",
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
+    }
+  </script>
 </head>
 <body>
-  <div id="controls">
-    <label><input type="checkbox" id="dark" /> Dark mode</label>
-    <label><input type="checkbox" id="buildingNames" checked /> Building names</label>
-    <details>
-      <summary>Advanced</summary>
-      <label>Tile URL template
-        <input type="text" id="tileUrl" />
-      </label>
-      <label>Glyphs URL template
-        <input type="text" id="glyphsUrl" />
-      </label>
-    </details>
-    <button id="apply">Apply</button>
-    <div id="error"></div>
-
-    <hr />
-    <div id="directions">
-      <div class="row">
-        <div class="combobox">
-          <input type="text" id="fromInput" placeholder="From (building or my location)" autocomplete="off"
-                 role="combobox" aria-expanded="false" aria-controls="fromList" aria-autocomplete="list" />
-          <ul class="combobox-list" id="fromList" role="listbox" hidden></ul>
-        </div>
-        <button id="useLocation" type="button" title="Use my current location">📍</button>
-      </div>
-      <div class="combobox">
-        <input type="text" id="toInput" placeholder="To (building)" autocomplete="off"
-               role="combobox" aria-expanded="false" aria-controls="toList" aria-autocomplete="list" />
-        <ul class="combobox-list" id="toList" role="listbox" hidden></ul>
-      </div>
-      <label><input type="radio" name="profile" value="walk" checked /> Walk</label>
-      <label><input type="radio" name="profile" value="drive" /> Drive</label>
-      <button id="getDirections" type="button">Get directions</button>
-      <div id="routeInfo"></div>
-    </div>
-  </div>
-  <div id="map"></div>
-  <script type="module" src="./main.ts"></script>
+  <div id="root"></div>
+  <noscript>
+    IIT Bombay campus map and walking/driving directions. This app requires JavaScript to run.
+  </noscript>
+  <script type="module" src="./src/main.tsx"></script>
 </body>
 </html>
