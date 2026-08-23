@@ -33,7 +33,6 @@ describe("campusLayers", () => {
       return (layer.paint as Record<string, unknown> | undefined)?.[prop] as string;
     };
 
-    // Light-mode building fill is dark-toned (low lightness); dark-mode is light-toned.
     expect(hexLightness(paintOf(false, "campus-building", "fill-color"))).toBeLessThan(
       hexLightness(paintOf(true, "campus-building", "fill-color")),
     );

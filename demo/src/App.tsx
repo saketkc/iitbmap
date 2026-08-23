@@ -224,7 +224,6 @@ export default function App() {
   const latestRef = React.useRef(latest);
   latestRef.current = latest;
 
-  // Map creation: once on mount only.
   React.useEffect(() => {
     if (!mapContainerRef.current) return;
     let style;
@@ -278,7 +277,6 @@ export default function App() {
     drawRouteLayer(map, routeState.routes, routeState.selectedIndex);
   }, [routeState]);
 
-  // Shareable-URL restore on mount, plus keeping it in sync with back/forward navigation.
   React.useEffect(() => {
     function restoreFromUrl(): boolean {
       const shared = readSharedRoute(new URL(window.location.href));
@@ -351,6 +349,7 @@ export default function App() {
                   onCheckedChange={(v) => {
                     const next = v === true;
                     setDark(next);
+                    document.documentElement.classList.toggle("dark", next);
                     const map = mapRef.current;
                     if (map && map.isStyleLoaded()) setCampusTheme(map, next);
                   }}
@@ -393,7 +392,7 @@ export default function App() {
 
               <Separator />
 
-              <div className="flex gap-2">
+              <div className="flex items-center gap-2">
                 <BuildingCombobox
                   id="fromInput"
                   value={fromValue}
@@ -402,7 +401,13 @@ export default function App() {
                   placeholder="From (building or my location)"
                   className="flex-1"
                 />
-                <Button variant="outline" size="icon" title="Use my current location" onClick={useMyLocation}>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  title="Use my current location"
+                  aria-label="Use my current location"
+                  onClick={useMyLocation}
+                >
                   <MapPin className="size-4" />
                 </Button>
               </div>

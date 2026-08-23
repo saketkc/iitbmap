@@ -8,8 +8,10 @@ export const IITB_BUILDINGS = buildings as FeatureCollection;
 export const BUILDINGS_SOURCE_ID = "buildings";
 export const BUILDING_LABEL_LAYER_ID = "building-label";
 
-const LABEL_COLOR = { light: "#44403c", dark: "#d6d3d1" } as const;
-const LABEL_HALO = { light: "#ffffff", dark: "#14171a" } as const;
+// Building fill is dark in light mode and light in dark mode (see style.ts PALETTE),
+// so label text must invert against it, not match the line/building color family.
+const LABEL_COLOR = { light: "#faf9f7", dark: "#1c1917" } as const;
+const LABEL_HALO = { light: "#1c1917", dark: "#faf9f7" } as const;
 
 /** Requires a configured glyph URL because the basemap supplies none. */
 export function buildingLabelLayer(opts: { dark?: boolean } = {}): SymbolLayerSpecification {
@@ -29,7 +31,7 @@ export function buildingLabelLayer(opts: { dark?: boolean } = {}): SymbolLayerSp
     paint: {
       "text-color": LABEL_COLOR[theme],
       "text-halo-color": LABEL_HALO[theme],
-      "text-halo-width": 1.2,
+      "text-halo-width": 1.5,
     },
   };
 }

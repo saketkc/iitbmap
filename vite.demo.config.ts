@@ -16,4 +16,13 @@ export default defineConfig({
   server: { port: 5183 },
   plugins: [react(), tailwindcss()],
   resolve: { alias: { "@": path.resolve(__dirname, "demo/src") } },
+  build: {
+    rollupOptions: {
+      output: {
+        // maplibre-gl is by far the largest dependency and changes far less often than
+        // app code, so splitting it out lets browsers cache it separately across deploys.
+        manualChunks: { "maplibre-gl": ["maplibre-gl"] },
+      },
+    },
+  },
 });

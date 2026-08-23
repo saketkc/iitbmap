@@ -28,6 +28,7 @@ interface BuildingComboboxProps {
 
 export function BuildingCombobox({ id, value, onValueChange, buildingNames, placeholder, className }: BuildingComboboxProps) {
   const [open, setOpen] = React.useState(false);
+  const [highlightedIndex, setHighlightedIndex] = React.useState(0);
 
   const matches = React.useMemo(() => {
     const q = value.trim().toLowerCase();
@@ -35,6 +36,18 @@ export function BuildingCombobox({ id, value, onValueChange, buildingNames, plac
     return buildingNames.filter((n) => n.toLowerCase().includes(q)).slice(0, 8);
   }, [value, buildingNames]);
   const showPopover = open && matches.length > 0;
+
+  React.useEffect(() => setHighlightedIndex(0), [matches]);
+
+  const listboxId = `${id}-listbox`;
+  const optionId = (i: number) => `${id}-option-${i}`;
+
+  function selectMatch(i: number) {
+    const name = matches[i];
+    if (!name) return;
+    onValueChange(name);
+    setOpen(false);
+  }
 
   return (
     <Popover open={showPopover} onOpenChange={setOpen}>
@@ -46,6 +59,9 @@ export function BuildingCombobox({ id, value, onValueChange, buildingNames, plac
           autoComplete="off"
           role="combobox"
           aria-expanded={showPopover}
+          aria-autocomplete="list"
+          aria-controls={listboxId}
+          aria-activedescendant={showPopover ? optionId(highlightedIndex) : undefined}
           className={className}
           onChange={(e) => {
             onValueChange(e.target.value);
@@ -53,7 +69,21 @@ export function BuildingCombobox({ id, value, onValueChange, buildingNames, plac
           }}
           onFocus={() => setOpen(true)}
           onKeyDown={(e) => {
-            if (e.key === "Escape") setOpen(false);
+            if (e.key === "Escape") {
+              setOpen(false);
+              return;
+            }
+            if (!showPopover) return;
+            if (e.key === "ArrowDown") {
+              e.preventDefault();
+              setHighlightedIndex((i) => Math.min(i + 1, matches.length - 1));
+            } else if (e.key === "ArrowUp") {
+              e.preventDefault();
+              setHighlightedIndex((i) => Math.max(i - 1, 0));
+            } else if (e.key === "Enter") {
+              e.preventDefault();
+              selectMatch(highlightedIndex);
+            }
           }}
         />
       </PopoverAnchor>
@@ -65,17 +95,16 @@ export function BuildingCombobox({ id, value, onValueChange, buildingNames, plac
         }}
       >
         <Command shouldFilter={false}>
-          <CommandList>
+          <CommandList id={listboxId}>
             <CommandEmpty>No matching building.</CommandEmpty>
-            {matches.map((name) => (
+            {matches.map((name, i) => (
               <CommandItem
                 key={name}
+                id={optionId(i)}
                 value={name}
-                onSelect={() => {
-                  onValueChange(name);
-                  setOpen(false);
-                }}
-                className={cn(name === value && "bg-accent text-accent-foreground")}
+                onSelect={() => selectMatch(i)}
+                onMouseEnter={() => setHighlightedIndex(i)}
+                className={cn((i === highlightedIndex || name === value) && "bg-accent text-accent-foreground")}
               >
                 {highlightMatch(name, value)}
               </CommandItem>

@@ -7,7 +7,6 @@ export interface SharedRoute {
   routeIndex: number;
 }
 
-/** Reads a shareable directions request from the demo URL. */
 export function readSharedRoute(url: URL): SharedRoute | null {
   const from = url.searchParams.get("from")?.trim();
   const to = url.searchParams.get("to")?.trim();
