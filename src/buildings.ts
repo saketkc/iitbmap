@@ -23,16 +23,16 @@ export function buildingLabelLayer(opts: { dark?: boolean } = {}): SymbolLayerSp
     minzoom: MIN_ZOOM,
     layout: {
       "text-field": ["get", "name"],
-      "text-font": ["Noto Sans Regular"],
-      "text-size": ["interpolate", ["linear"], ["zoom"], MIN_ZOOM, 7, 18, 12],
+      "text-font": ["Inter Regular"],
+      "text-size": ["interpolate", ["linear"], ["zoom"], MIN_ZOOM, 11, 18, 16],
       "text-max-width": 8,
       "symbol-avoid-edges": true,
     },
     paint: {
       "text-color": LABEL_COLOR[theme],
       "text-halo-color": LABEL_HALO[theme],
-      "text-halo-width": 1,
-      "text-halo-blur": 0,
+      "text-halo-width": 0.8,
+      "text-halo-blur": 0.5,
     },
   };
 }
