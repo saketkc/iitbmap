@@ -17,7 +17,7 @@ export const ATTRIBUTION =
 
 const PALETTE = {
   light: { green: "#7cb069", parking: "#a8a29e", building: "#57534e", water: "#5b9bd5", line: "#44403c" },
-  dark: { green: "#7fb85f", parking: "#6b6560", building: "#c4b9ac", water: "#6cb4e8", line: "#d6d3d1" },
+  dark: { green: "#7fb85f", parking: "#7d8291", building: "#c4b9ac", water: "#6cb4e8", line: "#d6d3d1" },
 } as const;
 
 const STREET_WEIGHT: ExpressionSpecification = [
