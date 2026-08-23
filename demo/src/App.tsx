@@ -143,6 +143,7 @@ export default function App() {
   const [profile, setProfile] = React.useState<RoutingProfile>("walk");
   const [routeState, setRouteState] = React.useState<RouteState>({ routes: [], selectedIndex: 0 });
   const [error, setError] = React.useState("");
+  const [panelOpen, setPanelOpen] = React.useState(() => window.matchMedia("(min-width: 640px)").matches);
 
   const applyStyleOverrides = () => {
     const map = mapRef.current;
@@ -327,109 +328,125 @@ export default function App() {
   return (
     <>
       <Card
-        className="absolute z-10 w-[300px] gap-3 overflow-y-auto p-3 shadow-lg"
+        className="absolute z-10 w-[min(320px,calc(100vw-24px))] gap-0 overflow-y-auto p-3 shadow-lg"
         style={{
           top: "max(12px, env(safe-area-inset-top))",
           left: "max(12px, env(safe-area-inset-left))",
           maxHeight: "calc(100vh - max(24px, env(safe-area-inset-top) + env(safe-area-inset-bottom) + 24px))",
         }}
       >
-        <CardContent className="flex flex-col gap-3 px-1">
-          <div className="flex items-center gap-2">
-            <Checkbox
-              id="dark"
-              checked={dark}
-              onCheckedChange={(v) => {
-                const next = v === true;
-                setDark(next);
-                const map = mapRef.current;
-                if (map && map.isStyleLoaded()) setCampusTheme(map, next);
-              }}
-            />
-            <Label htmlFor="dark">Dark mode</Label>
-          </div>
-          <div className="flex items-center gap-2">
-            <Checkbox
-              id="buildingNames"
-              checked={buildingNamesVisible}
-              onCheckedChange={(v) => {
-                const next = v === true;
-                setBuildingNamesVisible(next);
-                const map = mapRef.current;
-                if (map && map.isStyleLoaded()) setBuildingLabelsVisible(map, next);
-              }}
-            />
-            <Label htmlFor="buildingNames">Building names</Label>
-          </div>
-
-          <Collapsible>
-            <CollapsibleTrigger asChild>
-              <Button variant="ghost" size="sm" className="w-full justify-between px-2 text-muted-foreground">
-                Advanced
-                <ChevronsUpDown className="size-3.5" />
-              </Button>
-            </CollapsibleTrigger>
-            <CollapsibleContent className="flex flex-col gap-2 pt-2">
-              <LabeledInput id="tileUrl" label="Tile URL template" value={tileUrlDraft} onChange={setTileUrlDraft} />
-              <LabeledInput id="glyphsUrl" label="Glyphs URL template" value={glyphsUrlDraft} onChange={setGlyphsUrlDraft} />
-            </CollapsibleContent>
-          </Collapsible>
-          <Button onClick={applyStyleOverrides}>Apply</Button>
-
-          {error && (
-            <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
-
-          <Separator />
-
-          <div className="flex gap-2">
-            <BuildingCombobox
-              id="fromInput"
-              value={fromValue}
-              onValueChange={setFromValue}
-              buildingNames={buildingNames}
-              placeholder="From (building or my location)"
-              className="flex-1"
-            />
-            <Button variant="outline" size="icon" title="Use my current location" onClick={useMyLocation}>
-              <MapPin className="size-4" />
+        <Collapsible open={panelOpen} onOpenChange={setPanelOpen}>
+          <CollapsibleTrigger asChild>
+            <Button variant="ghost" size="sm" className="w-full justify-between px-2 font-semibold">
+              Directions
+              <ChevronsUpDown className="size-3.5" />
             </Button>
-          </div>
-          <BuildingCombobox id="toInput" value={toValue} onValueChange={setToValue} buildingNames={buildingNames} placeholder="To (building)" />
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <CardContent className="flex flex-col gap-3 px-1 pt-3">
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="dark"
+                  checked={dark}
+                  onCheckedChange={(v) => {
+                    const next = v === true;
+                    setDark(next);
+                    const map = mapRef.current;
+                    if (map && map.isStyleLoaded()) setCampusTheme(map, next);
+                  }}
+                />
+                <Label htmlFor="dark">Dark mode</Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="buildingNames"
+                  checked={buildingNamesVisible}
+                  onCheckedChange={(v) => {
+                    const next = v === true;
+                    setBuildingNamesVisible(next);
+                    const map = mapRef.current;
+                    if (map && map.isStyleLoaded()) setBuildingLabelsVisible(map, next);
+                  }}
+                />
+                <Label htmlFor="buildingNames">Building names</Label>
+              </div>
 
-          <ToggleGroup type="single" value={profile} onValueChange={(v) => v && setProfile(v as RoutingProfile)}>
-            <ToggleGroupItem value="walk" className="flex-1">
-              Walk
-            </ToggleGroupItem>
-            <ToggleGroupItem value="drive" className="flex-1">
-              Drive
-            </ToggleGroupItem>
-          </ToggleGroup>
+              <Collapsible>
+                <CollapsibleTrigger asChild>
+                  <Button variant="ghost" size="sm" className="w-full justify-between px-2 text-muted-foreground">
+                    Advanced
+                    <ChevronsUpDown className="size-3.5" />
+                  </Button>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="flex flex-col gap-2 pt-2">
+                  <LabeledInput id="tileUrl" label="Tile URL template" value={tileUrlDraft} onChange={setTileUrlDraft} />
+                  <LabeledInput id="glyphsUrl" label="Glyphs URL template" value={glyphsUrlDraft} onChange={setGlyphsUrlDraft} />
+                </CollapsibleContent>
+              </Collapsible>
+              <Button onClick={applyStyleOverrides}>Apply</Button>
 
-          <Button onClick={searchDirections}>Get directions</Button>
+              {error && (
+                <Alert variant="destructive">
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
 
-          {routeState.routes.length > 0 && (
-            <ToggleGroup
-              type="single"
-              orientation="vertical"
-              value={String(routeState.selectedIndex)}
-              onValueChange={(v) => {
-                if (!v) return;
-                const i = Number(v);
-                setRouteState((s) => ({ ...s, selectedIndex: i }));
-                pushRouteUrl(i);
-              }}
-            >
-              {routeState.routes.map((route, i) => (
-                <ToggleGroupItem key={i} value={String(i)}>
-                  {formatRouteInfo(route, profile)}
+              <Separator />
+
+              <div className="flex gap-2">
+                <BuildingCombobox
+                  id="fromInput"
+                  value={fromValue}
+                  onValueChange={setFromValue}
+                  buildingNames={buildingNames}
+                  placeholder="From (building or my location)"
+                  className="flex-1"
+                />
+                <Button variant="outline" size="icon" title="Use my current location" onClick={useMyLocation}>
+                  <MapPin className="size-4" />
+                </Button>
+              </div>
+              <BuildingCombobox
+                id="toInput"
+                value={toValue}
+                onValueChange={setToValue}
+                buildingNames={buildingNames}
+                placeholder="To (building)"
+              />
+
+              <ToggleGroup type="single" value={profile} onValueChange={(v) => v && setProfile(v as RoutingProfile)}>
+                <ToggleGroupItem value="walk" className="flex-1">
+                  Walk
                 </ToggleGroupItem>
-              ))}
-            </ToggleGroup>
-          )}
-        </CardContent>
+                <ToggleGroupItem value="drive" className="flex-1">
+                  Drive
+                </ToggleGroupItem>
+              </ToggleGroup>
+
+              <Button onClick={searchDirections}>Get directions</Button>
+
+              {routeState.routes.length > 0 && (
+                <ToggleGroup
+                  type="single"
+                  orientation="vertical"
+                  value={String(routeState.selectedIndex)}
+                  onValueChange={(v) => {
+                    if (!v) return;
+                    const i = Number(v);
+                    setRouteState((s) => ({ ...s, selectedIndex: i }));
+                    pushRouteUrl(i);
+                  }}
+                >
+                  {routeState.routes.map((route, i) => (
+                    <ToggleGroupItem key={i} value={String(i)}>
+                      {formatRouteInfo(route, profile)}
+                    </ToggleGroupItem>
+                  ))}
+                </ToggleGroup>
+              )}
+            </CardContent>
+          </CollapsibleContent>
+        </Collapsible>
       </Card>
       <div id="map" ref={mapContainerRef} />
     </>

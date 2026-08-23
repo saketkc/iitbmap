@@ -3,6 +3,7 @@ dist/
 demo/dist/
 *.tsbuildinfo
 .DS_Store
+.venv/
 .claude/
 .cloudflare
 .cloudflare2
