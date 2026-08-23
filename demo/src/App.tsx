@@ -6,7 +6,6 @@ import { ChevronsUpDown, MapPin } from "lucide-react";
 import {
   getCampusStyle,
   setCampusTheme,
-  CAMPUS_BOUNDS,
   CAMPUS_CENTER,
   MIN_ZOOM,
   MAX_ZOOM,
@@ -237,11 +236,10 @@ export default function App() {
     const map = new maplibregl.Map({
       container: mapContainerRef.current,
       style,
-      bounds: CAMPUS_BOUNDS,
       center: CAMPUS_CENTER,
+      zoom: 16,
       minZoom: MIN_ZOOM,
       maxZoom: MAX_ZOOM,
-      fitBoundsOptions: { padding: 24 },
     });
     mapRef.current = map;
 

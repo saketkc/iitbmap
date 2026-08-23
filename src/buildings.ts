@@ -31,7 +31,8 @@ export function buildingLabelLayer(opts: { dark?: boolean } = {}): SymbolLayerSp
     paint: {
       "text-color": LABEL_COLOR[theme],
       "text-halo-color": LABEL_HALO[theme],
-      "text-halo-width": 1.5,
+      "text-halo-width": 1,
+      "text-halo-blur": 0,
     },
   };
 }
