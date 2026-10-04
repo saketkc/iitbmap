@@ -1,6 +1,6 @@
 import * as React from "react";
 import maplibregl from "maplibre-gl";
-import { ChevronsUpDown, MapPin, Share2 } from "lucide-react";
+import { MapPin, Navigation, Settings, Share2, X } from "lucide-react";
 
 import {
   getCampusStyle,
@@ -27,7 +27,6 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { BuildingCombobox } from "@/components/building-combobox";
@@ -157,7 +156,8 @@ export default function App() {
   const [routeState, setRouteState] = React.useState<RouteState>({ routes: [], selectedIndex: 0 });
   const [error, setError] = React.useState("");
   const [linkCopied, setLinkCopied] = React.useState(false);
-  const [panelOpen, setPanelOpen] = React.useState(() => window.matchMedia(WIDE_SCREEN).matches);
+  const [settingsOpen, setSettingsOpen] = React.useState(false);
+  const [directions, setDirections] = React.useState(false);
 
   const applyStyleOverrides = () => {
     const map = mapRef.current;
@@ -239,7 +239,7 @@ export default function App() {
       (b, c) => b.extend(c as [number, number]),
       new maplibregl.LngLatBounds(allCoords[0], allCoords[0]),
     );
-    const panelRight = panelOpen && window.matchMedia(WIDE_SCREEN).matches ? (panelRef.current?.getBoundingClientRect().right ?? 0) : 0;
+    const panelRight = window.matchMedia(WIDE_SCREEN).matches ? (panelRef.current?.getBoundingClientRect().right ?? 0) : 0;
     map.fitBounds(bounds, { padding: { top: FIT_PADDING, right: FIT_PADDING, bottom: FIT_PADDING, left: panelRight + FIT_PADDING } });
   };
 
@@ -255,6 +255,13 @@ export default function App() {
     toMarkerRef.current?.remove();
     fromMarkerRef.current = null;
     toMarkerRef.current = null;
+  };
+
+  // clear From too, or style.load re-routes
+  const exitDirections = () => {
+    setDirections(false);
+    setFromValue("");
+    clearRoute();
   };
 
   // Bridges into MapLibre's persistent `style.load` listener, which is registered once
@@ -340,6 +347,7 @@ export default function App() {
     function restoreFromUrl(): boolean {
       const shared = readSharedRoute(new URL(window.location.href));
       if (!shared) return false;
+      setDirections(true);
       setFromValue(shared.from);
       setToValue(shared.to);
       setProfile(shared.profile);
@@ -351,7 +359,7 @@ export default function App() {
 
     function onPopState() {
       if (!restoreFromUrl()) {
-        clearRoute();
+        exitDirections();
         return;
       }
       if (styleReadyRef.current) latestRef.current.recomputeRoute();
@@ -365,7 +373,7 @@ export default function App() {
 
   // live directions from the GPS fix; only the first route fits the camera, so later fixes don't fight panning
   React.useEffect(() => {
-    if (!myLocation || !inCampusBbox(myLocation[1], myLocation[0]) || !toPlace) return;
+    if (!directions || !myLocation || !inCampusBbox(myLocation[1], myLocation[0]) || !toPlace) return;
     if (!fromValue.trim()) {
       setFromValue(MY_LOCATION_LABEL);
       return;
@@ -377,7 +385,16 @@ export default function App() {
     lastRoutedFixRef.current = { at: myLocation, to: toValue };
     computeRoute(routeState.selectedIndex, { pushUrl: false, fit: routeState.routes.length === 0 });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [myLocation, fromValue, toValue]);
+  }, [directions, myLocation, fromValue, toValue]);
+
+  // computeRoute owns the camera in directions mode
+  React.useEffect(() => {
+    const map = mapRef.current;
+    if (directions || !map || !toPlace) return;
+    toMarkerRef.current = setMarker(map, toMarkerRef.current, toPlace, MARKER_COLORS.end);
+    map.flyTo({ center: toPlace, zoom: Math.max(map.getZoom(), 17) });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [toValue, directions]);
 
   // Service worker registration, production only (avoids fighting Vite's dev HMR).
   React.useEffect(() => {
@@ -403,15 +420,115 @@ export default function App() {
           maxHeight: "calc(100vh - max(24px, env(safe-area-inset-top) + env(safe-area-inset-bottom) + 24px))",
         }}
       >
-        <Collapsible open={panelOpen} onOpenChange={setPanelOpen}>
-          <CollapsibleTrigger asChild>
-            <Button variant="ghost" size="sm" className="w-full justify-between px-2 font-semibold">
-              Directions
-              <ChevronsUpDown className="size-3.5" />
+        <CardContent className="flex flex-col gap-3 p-0">
+          {directions && (
+            <div className="flex items-center gap-2">
+              <BuildingCombobox
+                id="fromInput"
+                value={fromValue}
+                onValueChange={setFromValue}
+                buildingNames={buildingNames}
+                placeholder="From (building, DIGIPIN, my location)"
+                className="flex-1"
+              />
+              <Button
+                variant="outline"
+                size="icon"
+                title="Use my current location"
+                aria-label="Use my current location"
+                onClick={useMyLocation}
+              >
+                <MapPin className="size-4" />
+              </Button>
+            </div>
+          )}
+          <div className="flex items-center gap-2">
+            <BuildingCombobox
+              id="toInput"
+              value={toValue}
+              onValueChange={setToValue}
+              buildingNames={buildingNames}
+              placeholder={directions ? "To (building or DIGIPIN)" : "Search buildings"}
+              className="flex-1"
+            />
+            <Button
+              variant="ghost"
+              size="icon"
+              title="Settings"
+              aria-label="Settings"
+              aria-expanded={settingsOpen}
+              onClick={() => setSettingsOpen((o) => !o)}
+            >
+              <Settings className="size-4" />
             </Button>
-          </CollapsibleTrigger>
-          <CollapsibleContent>
-            <CardContent className="flex flex-col gap-3 px-1 pt-3">
+          </div>
+
+          <DigipinHint label="To" place={toPlace} />
+          {directions && (
+            <>
+              {fromIsMe && <DigipinHint label="You" place={myLocation} />}
+              <ToggleGroup type="single" value={profile} onValueChange={(v) => v && setProfile(v as RoutingProfile)}>
+                <ToggleGroupItem value="walk" className="flex-1">
+                  Walk
+                </ToggleGroupItem>
+                <ToggleGroupItem value="drive" className="flex-1">
+                  Drive
+                </ToggleGroupItem>
+              </ToggleGroup>
+            </>
+          )}
+
+          <div className="flex gap-2">
+            {directions ? (
+              <Button className="flex-1" onClick={searchDirections}>
+                Get directions
+              </Button>
+            ) : (
+              <Button className="flex-1" onClick={() => setDirections(true)} disabled={!toPlace}>
+                <Navigation className="size-4" />
+                Directions
+              </Button>
+            )}
+            <Button variant="outline" onClick={shareLink} disabled={!toPlace}>
+              <Share2 className="size-4" />
+              {linkCopied ? "Link copied" : "Share"}
+            </Button>
+            {directions && (
+              <Button variant="ghost" size="icon" title="Close directions" aria-label="Close directions" onClick={exitDirections}>
+                <X className="size-4" />
+              </Button>
+            )}
+          </div>
+
+          {error && (
+            <Alert variant="destructive">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+
+          {routeState.routes.length > 0 && (
+            <ToggleGroup
+              type="single"
+              orientation="vertical"
+              value={String(routeState.selectedIndex)}
+              onValueChange={(v) => {
+                if (!v) return;
+                const i = Number(v);
+                setRouteState((s) => ({ ...s, selectedIndex: i }));
+                pushRouteUrl(i);
+              }}
+            >
+              {routeState.routes.map((route, i) => (
+                <ToggleGroupItem key={i} value={String(i)}>
+                  {formatRouteInfo(route, profile)}
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
+          )}
+
+          {settingsOpen && (
+            <>
+              <Separator />
               <div className="flex items-center gap-2">
                 <Checkbox
                   id="dark"
@@ -439,100 +556,12 @@ export default function App() {
                 />
                 <Label htmlFor="buildingNames">Building names</Label>
               </div>
-
-              <Collapsible>
-                <CollapsibleTrigger asChild>
-                  <Button variant="ghost" size="sm" className="w-full justify-between px-2 text-muted-foreground">
-                    Advanced
-                    <ChevronsUpDown className="size-3.5" />
-                  </Button>
-                </CollapsibleTrigger>
-                <CollapsibleContent className="flex flex-col gap-2 pt-2">
-                  <LabeledInput id="tileUrl" label="Tile URL template" value={tileUrlDraft} onChange={setTileUrlDraft} />
-                  <LabeledInput id="glyphsUrl" label="Glyphs URL template" value={glyphsUrlDraft} onChange={setGlyphsUrlDraft} />
-                </CollapsibleContent>
-              </Collapsible>
+              <LabeledInput id="tileUrl" label="Tile URL template" value={tileUrlDraft} onChange={setTileUrlDraft} />
+              <LabeledInput id="glyphsUrl" label="Glyphs URL template" value={glyphsUrlDraft} onChange={setGlyphsUrlDraft} />
               <Button onClick={applyStyleOverrides}>Apply</Button>
-
-              {error && (
-                <Alert variant="destructive">
-                  <AlertDescription>{error}</AlertDescription>
-                </Alert>
-              )}
-
-              <Separator />
-
-              <div className="flex items-center gap-2">
-                <BuildingCombobox
-                  id="fromInput"
-                  value={fromValue}
-                  onValueChange={setFromValue}
-                  buildingNames={buildingNames}
-                  placeholder="From (building, DIGIPIN, my location)"
-                  className="flex-1"
-                />
-                <Button
-                  variant="outline"
-                  size="icon"
-                  title="Use my current location"
-                  aria-label="Use my current location"
-                  onClick={useMyLocation}
-                >
-                  <MapPin className="size-4" />
-                </Button>
-              </div>
-              <BuildingCombobox
-                id="toInput"
-                value={toValue}
-                onValueChange={setToValue}
-                buildingNames={buildingNames}
-                placeholder="To (building or DIGIPIN)"
-              />
-
-              <DigipinHint label="To" place={toPlace} />
-              {fromIsMe && <DigipinHint label="You" place={myLocation} />}
-
-              <ToggleGroup type="single" value={profile} onValueChange={(v) => v && setProfile(v as RoutingProfile)}>
-                <ToggleGroupItem value="walk" className="flex-1">
-                  Walk
-                </ToggleGroupItem>
-                <ToggleGroupItem value="drive" className="flex-1">
-                  Drive
-                </ToggleGroupItem>
-              </ToggleGroup>
-
-              <div className="flex gap-2">
-                <Button className="flex-1" onClick={searchDirections}>
-                  Get directions
-                </Button>
-                <Button variant="outline" onClick={shareLink} disabled={!toPlace}>
-                  <Share2 className="size-4" />
-                  {linkCopied ? "Link copied" : "Share"}
-                </Button>
-              </div>
-
-              {routeState.routes.length > 0 && (
-                <ToggleGroup
-                  type="single"
-                  orientation="vertical"
-                  value={String(routeState.selectedIndex)}
-                  onValueChange={(v) => {
-                    if (!v) return;
-                    const i = Number(v);
-                    setRouteState((s) => ({ ...s, selectedIndex: i }));
-                    pushRouteUrl(i);
-                  }}
-                >
-                  {routeState.routes.map((route, i) => (
-                    <ToggleGroupItem key={i} value={String(i)}>
-                      {formatRouteInfo(route, profile)}
-                    </ToggleGroupItem>
-                  ))}
-                </ToggleGroup>
-              )}
-            </CardContent>
-          </CollapsibleContent>
-        </Collapsible>
+            </>
+          )}
+        </CardContent>
       </Card>
       <div id="map" ref={mapContainerRef} />
     </>
