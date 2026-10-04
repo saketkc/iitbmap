@@ -9,7 +9,7 @@ export const BUILDING_ALIASES: Record<string, string[]> = {
   SOM: ["SJMSOM", "School of Management"],
   "Viktor Menezes Convention Centre": ["VMCC", "Victor Menezes Convention Centre"],
   "PC Saxena Auditorium LT": ["PCSA", "PC Saxena Auditorium"],
-  "Staff Hostel Annexe": ["SHA", "Staff Hostel"],
+  "Staff Hostel Annexe": ["SHA"],
   "Department of Chemical Engineering and Chemistry": ["ChemE"],
   "Aerospace Department": ["AE"],
   "Aerospace Engineering (Annex) + HSS": ["HSS", "Humanities", "Humanities and Social Sciences"],
@@ -32,3 +32,5 @@ export const BUILDING_ALIASES: Record<string, string[]> = {
   "Main Gate (Gate 2)": ["Gate 2", "IITB Main Gate"],
   "Market Gate (Gate 3)": ["Gate 3", "YP Gate"],
 };
+// Bungalows are also called A-1, A-2, ...
+for (let n = 1; n <= 19; n++) BUILDING_ALIASES[n === 1 ? "Bungalow 1 (Directors Bungalow)" : `Bungalow ${n}`] = [`A-${n}`];
