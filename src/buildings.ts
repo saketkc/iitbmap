@@ -43,18 +43,20 @@ export function setBuildingLabelsVisible(map: MaplibreMap, visible: boolean): vo
 
 export function buildingCentroid(feature: Feature<Polygon>): [number, number] {
   const ring = feature.geometry.coordinates[0];
+  // raw lng*lat products cancel to noise on small polygons
+  const [ox, oy] = ring[0];
   let x = 0;
   let y = 0;
   let area = 0;
   for (let i = 0; i < ring.length - 1; i++) {
-    const [x0, y0] = ring[i];
-    const [x1, y1] = ring[i + 1];
+    const x0 = ring[i][0] - ox, y0 = ring[i][1] - oy;
+    const x1 = ring[i + 1][0] - ox, y1 = ring[i + 1][1] - oy;
     const cross = x0 * y1 - x1 * y0;
     area += cross;
     x += (x0 + x1) * cross;
     y += (y0 + y1) * cross;
   }
   area /= 2;
-  if (area === 0) return ring[0] as [number, number];
-  return [x / (6 * area), y / (6 * area)];
+  if (area === 0) return [ox, oy];
+  return [ox + x / (6 * area), oy + y / (6 * area)];
 }

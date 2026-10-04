@@ -14,6 +14,9 @@ interface Env {
   APP_URL: string;
 }
 
+// only crawlers get the OG page; an unlisted one follows the redirect to the destination's preview
+const CRAWLER = /bot|crawl|spider|preview|facebookexternalhit|whatsapp|slack|discord|telegram|linkedin|skype|embedly|vkshare|pinterest|snapchat|iframely/i;
+
 let wasmReady: Promise<void> | undefined;
 const FONTS = [new Uint8Array(inter400), new Uint8Array(inter700)];
 
@@ -82,7 +85,11 @@ export default {
     const url = new URL(request.url);
     if (request.method !== "GET" && request.method !== "HEAD") return new Response("Method not allowed", { status: 405 });
     const shared = readSharedRoute(url);
-    if (url.pathname === "/r" || url.pathname === "/r/") return shared ? sharePage(env, url, shared) : Response.redirect(env.APP_URL, 302);
+    if (url.pathname === "/r" || url.pathname === "/r/") {
+      if (!shared) return Response.redirect(env.APP_URL, 302);
+      if (!CRAWLER.test(request.headers.get("user-agent") ?? "")) return Response.redirect(routeLink(env.APP_URL, shared).href, 302);
+      return sharePage(env, url, shared);
+    }
     if (url.pathname === "/og.png" && shared) return routeImage(request, url, shared, ctx);
     return Response.redirect(env.APP_URL, 302);
   },

@@ -26,23 +26,28 @@ function wordCost(typed: string, word: string): number {
 }
 
 const NO_ALIASES: Record<string, string[]> = {};
-const STOPWORDS = new Set(["of", "and", "for", "the", "in"]);
+const STOPWORDS = new Set(["of", "and", "for", "the", "in", "no"]);
 
 interface Entry {
   name: string;
   full: string; // normalized name
   words: string[]; // matched with typo tolerance
   codes: string[]; // initialisms and aliases; exact prefix only, typos on short codes match everything
+  aliases: string[]; // hand-written, so an exact match outranks an initialism
 }
 
 function toEntry(name: string, aliases: string[]): Entry {
   const full = normalize(name);
   const words = full.split(" ");
-  const initials = words.filter((w) => !STOPWORDS.has(w)).map((w) => w[0]).join("");
+  const initials = words.filter((w) => !STOPWORDS.has(w)).map((w) => (/^\d/.test(w) ? w : w[0])).join(""); // "Hostel 12" -> "h12"
   // every suffix, so "ese" matches as well as "dese"
   const codes = [...initials].map((_, i) => initials.slice(i)).filter((c) => c.length >= 2);
   const aliasWords = aliases.flatMap((a) => normalize(a).split(" "));
-  return { name, full, words: [...words, ...aliasWords], codes: [...codes, ...aliases.map((a) => normalize(a).replace(/ /g, ""))] };
+  const aliasCodes = aliases.map((a) => normalize(a).replace(/ /g, ""));
+  // campus shorthand: "H5" is Hostel 5 and its wings
+  const hostel = full.match(/^hostel (?:no )?(\d+) ?[a-d]?(?: wing)?$/);
+  if (hostel) aliasCodes.push(`h${hostel[1]}`);
+  return { name, full, words: [...words, ...aliasWords], codes: [...codes, ...aliasCodes], aliases: aliasCodes };
 }
 
 const entryCache = new WeakMap<string[], { aliases: Record<string, string[]>; entries: Entry[] }>();
@@ -58,9 +63,11 @@ export function searchNames(query: string, names: string[], aliases: Record<stri
   }
   const { entries } = cached;
   const typed = q.split(" ");
-  const scored: { name: string; cost: number }[] = [];
+  const code = q.replace(/ /g, "");
+  const scored: { name: string; tier: number; cost: number }[] = [];
   for (const e of entries) {
-    let cost = e.full.includes(q) ? -1 : 0; // exact substring hits rank above everything else
+    const tier = e.aliases.includes(code) ? 0 : e.codes.includes(code) ? 1 : e.full.includes(q) ? 2 : 3;
+    let cost = 0;
     for (const t of typed) {
       const best = e.codes.some((c) => c.startsWith(t)) ? 0 : Math.min(...e.words.map((w) => wordCost(t, w)));
       if (best > allowedTypos(t)) {
@@ -69,10 +76,10 @@ export function searchNames(query: string, names: string[], aliases: Record<stri
       }
       cost += best;
     }
-    if (cost !== Infinity) scored.push({ name: e.name, cost });
+    if (cost !== Infinity) scored.push({ name: e.name, tier, cost });
   }
   return scored
-    .sort((a, b) => a.cost - b.cost || a.name.length - b.name.length)
+    .sort((a, b) => a.tier - b.tier || a.cost - b.cost || a.name.length - b.name.length)
     .slice(0, 8)
     .map((s) => s.name);
 }

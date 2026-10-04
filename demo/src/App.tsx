@@ -18,7 +18,7 @@ import {
 import { readSharedRoute, routeLink, writeSharedRoute, type SharedRoute } from "@/lib/route-url";
 import { buildingPath, buildingSlug, slugFromPathname } from "@/lib/building-url";
 import { encodeDigipin } from "@/lib/digipin";
-import { MARKER_COLORS, MY_LOCATION_LABEL, SITE_TITLE, findBuildingCentroid, formatRouteInfo, resolvePlace } from "@/lib/places";
+import { MARKER_COLORS, MY_LOCATION_LABEL, findBuildingCentroid, formatRouteInfo, resolvePlace } from "@/lib/places";
 import { haversineMeters } from "../../src/routing";
 
 import { Card, CardContent } from "@/components/ui/card";
@@ -128,9 +128,16 @@ function DigipinHint({ label, place }: { label: string; place: [number, number] 
   );
 }
 
+// panel starts open and routes fit beside it from this width up
+const WIDE_SCREEN = "(min-width: 640px)";
+const FIT_PADDING = 48;
+
 export default function App() {
   const mapContainerRef = React.useRef<HTMLDivElement>(null);
   const mapRef = React.useRef<maplibregl.Map | null>(null);
+  const panelRef = React.useRef<HTMLDivElement>(null);
+  // isStyleLoaded() stays false until every tile loads
+  const styleReadyRef = React.useRef(false);
   const fromMarkerRef = React.useRef<maplibregl.Marker | null>(null);
   const toMarkerRef = React.useRef<maplibregl.Marker | null>(null);
   const geolocateRef = React.useRef<maplibregl.GeolocateControl | null>(null);
@@ -150,14 +157,17 @@ export default function App() {
   const [routeState, setRouteState] = React.useState<RouteState>({ routes: [], selectedIndex: 0 });
   const [error, setError] = React.useState("");
   const [linkCopied, setLinkCopied] = React.useState(false);
-  const [panelOpen, setPanelOpen] = React.useState(() => window.matchMedia("(min-width: 640px)").matches);
+  const [panelOpen, setPanelOpen] = React.useState(() => window.matchMedia(WIDE_SCREEN).matches);
 
   const applyStyleOverrides = () => {
     const map = mapRef.current;
     if (!map) return;
     try {
       setError("");
-      map.setStyle(getCampusStyle({ dark, tileUrl: tileUrlDraft || undefined, glyphsUrl: glyphsUrlDraft || undefined }));
+      const style = getCampusStyle({ dark, tileUrl: tileUrlDraft || undefined, glyphsUrl: glyphsUrlDraft || undefined });
+      styleReadyRef.current = false;
+      // a diffed setStyle skips style.load, which redraws the route
+      map.setStyle(style, { diff: false });
     } catch (err) {
       setError(toErrorMessage(err));
     }
@@ -185,15 +195,11 @@ export default function App() {
   const shareLink = async () => {
     const url = shareUrl();
     try {
-      if (navigator.share) {
-        await navigator.share({ title: `${toValue.trim()} | ${SITE_TITLE}`, url });
-        return;
-      }
       await navigator.clipboard.writeText(url);
       setLinkCopied(true);
       setTimeout(() => setLinkCopied(false), 2000);
     } catch (err) {
-      if ((err as Error).name !== "AbortError") setError(`Couldn't share: ${toErrorMessage(err)}`);
+      setError(`Couldn't share: ${toErrorMessage(err)}`);
     }
   };
 
@@ -233,7 +239,8 @@ export default function App() {
       (b, c) => b.extend(c as [number, number]),
       new maplibregl.LngLatBounds(allCoords[0], allCoords[0]),
     );
-    map.fitBounds(bounds, { padding: 48 });
+    const panelRight = panelOpen && window.matchMedia(WIDE_SCREEN).matches ? (panelRef.current?.getBoundingClientRect().right ?? 0) : 0;
+    map.fitBounds(bounds, { padding: { top: FIT_PADDING, right: FIT_PADDING, bottom: FIT_PADDING, left: panelRight + FIT_PADDING } });
   };
 
   // Two named entry points instead of one boolean-flag parameter: a fresh user-initiated
@@ -300,6 +307,7 @@ export default function App() {
     // URL-specified route (from/to populated, not yet resolved into routes) is
     // re-requested here rather than redrawn, since it hasn't been computed yet.
     map.on("style.load", () => {
+      styleReadyRef.current = true;
       const current = latestRef.current;
       setBuildingLabelsVisible(map, current.buildingNamesVisible);
       if (current.fromValue.trim() && current.toValue.trim() && current.routeState.routes.length === 0) {
@@ -324,7 +332,7 @@ export default function App() {
   // (see above), since setStyle() wipes what this effect doesn't recreate on its own.
   React.useEffect(() => {
     const map = mapRef.current;
-    if (!map || !map.isStyleLoaded()) return;
+    if (!map || !styleReadyRef.current) return;
     drawRouteLayer(map, routeState.routes, routeState.selectedIndex);
   }, [routeState]);
 
@@ -346,8 +354,7 @@ export default function App() {
         clearRoute();
         return;
       }
-      const map = mapRef.current;
-      if (map?.isStyleLoaded()) latestRef.current.recomputeRoute();
+      if (styleReadyRef.current) latestRef.current.recomputeRoute();
       // Otherwise the style.load handler picks up the now-populated from/to once the
       // map finishes (re)loading its style.
     }
@@ -363,7 +370,7 @@ export default function App() {
       setFromValue(MY_LOCATION_LABEL);
       return;
     }
-    if (!fromIsMe || !mapRef.current?.isStyleLoaded()) return;
+    if (!fromIsMe || !styleReadyRef.current) return;
     // skip GPS jitter; k-shortest-paths is too slow to rerun per fix
     const last = lastRoutedFixRef.current;
     if (routeState.routes.length > 0 && last?.to === toValue && haversineMeters(last.at, myLocation) < 10) return;
@@ -388,6 +395,7 @@ export default function App() {
   return (
     <>
       <Card
+        ref={panelRef}
         className="absolute z-10 w-[min(320px,calc(100vw-24px))] gap-0 overflow-y-auto p-3 shadow-lg"
         style={{
           top: "max(12px, env(safe-area-inset-top))",
@@ -413,7 +421,7 @@ export default function App() {
                     setDark(next);
                     document.documentElement.classList.toggle("dark", next);
                     const map = mapRef.current;
-                    if (map && map.isStyleLoaded()) setCampusTheme(map, next);
+                    if (map && styleReadyRef.current) setCampusTheme(map, next);
                   }}
                 />
                 <Label htmlFor="dark">Dark mode</Label>
@@ -426,7 +434,7 @@ export default function App() {
                     const next = v === true;
                     setBuildingNamesVisible(next);
                     const map = mapRef.current;
-                    if (map && map.isStyleLoaded()) setBuildingLabelsVisible(map, next);
+                    if (map && styleReadyRef.current) setBuildingLabelsVisible(map, next);
                   }}
                 />
                 <Label htmlFor="buildingNames">Building names</Label>

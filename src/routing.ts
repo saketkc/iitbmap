@@ -162,11 +162,9 @@ function kShortestPaths(adjacency: Adjacency, source: number, target: number, k:
 
 function toRoute(adjacency: Adjacency, result: PathResult, from: [number, number], to: [number, number]): Route {
   const coordinates = result.path.map((i) => adjacency.nodes[i]);
-  let distanceMeters = haversineMeters(from, coordinates[0]);
-  for (let i = 1; i < coordinates.length; i++) {
-    distanceMeters += haversineMeters(coordinates[i - 1], coordinates[i]);
-  }
-  distanceMeters += haversineMeters(coordinates[coordinates.length - 1], to);
+  // edge weights follow road curves the graph drops, so they give the distance
+  const distanceMeters =
+    haversineMeters(from, coordinates[0]) + result.distance + haversineMeters(coordinates[coordinates.length - 1], to);
   return { coordinates: [from, ...coordinates, to], distanceMeters };
 }
 

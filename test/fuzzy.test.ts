@@ -13,6 +13,8 @@ describe("searchNames", () => {
   it("ranks exact substring matches first", () => {
     expect(searchNames("KReSIT", names)[0]).toBe("KReSIT");
     expect(searchNames("hostel no 10", names)[0]).toBe("Hostel No 10");
+    expect(searchNames("h12", names)[0]).toBe("Hostel 12");
+    expect(searchNames("sha", names, BUILDING_ALIASES)[0]).toBe("Staff Hostel Annexe");
   });
 
   it.each([

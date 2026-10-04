@@ -19,3 +19,6 @@ scripts/geojson/
 
 # local Claude Code notes
 CLAUDE.md
+
+# osmnx HTTP cache from scripts/
+cache/
