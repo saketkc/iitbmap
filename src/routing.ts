@@ -14,7 +14,7 @@ interface ProfileGraph {
 
 const RAW_GRAPHS = graphs as Record<RoutingProfile, ProfileGraph>;
 
-function haversineMeters(a: [number, number], b: [number, number]): number {
+export function haversineMeters(a: [number, number], b: [number, number]): number {
   const R = 6371000;
   const [lng1, lat1] = a;
   const [lng2, lat2] = b;
@@ -66,7 +66,7 @@ interface PathResult {
   distance: number;
 }
 
-// ponytail: O(V^2) scan instead of a binary heap; fine at a few hundred nodes.
+// O(V^2) scan instead of a binary heap; fine at a few hundred nodes.
 function dijkstra(
   adjacency: Adjacency,
   source: number,

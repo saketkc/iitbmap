@@ -13,3 +13,9 @@ demo/dist/
 # symlink (e.g. `ln -s .../public/tiles assets/tiles` for local demo testing).
 tiles
 scripts/geojson/
+
+# wrangler dev state
+.wrangler/
+
+# local Claude Code notes
+CLAUDE.md

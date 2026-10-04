@@ -4,6 +4,8 @@ import { Input } from "@/components/ui/input";
 import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
 import { Command, CommandList, CommandEmpty, CommandItem } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
+import { searchNames } from "@/lib/fuzzy";
+import { BUILDING_ALIASES } from "@/lib/aliases";
 
 function highlightMatch(name: string, query: string): React.ReactNode {
   const i = name.toLowerCase().indexOf(query.toLowerCase());
@@ -30,11 +32,7 @@ export function BuildingCombobox({ id, value, onValueChange, buildingNames, plac
   const [open, setOpen] = React.useState(false);
   const [highlightedIndex, setHighlightedIndex] = React.useState(0);
 
-  const matches = React.useMemo(() => {
-    const q = value.trim().toLowerCase();
-    if (!q) return [];
-    return buildingNames.filter((n) => n.toLowerCase().includes(q)).slice(0, 8);
-  }, [value, buildingNames]);
+  const matches = React.useMemo(() => searchNames(value, buildingNames, BUILDING_ALIASES), [value, buildingNames]);
   const showPopover = open && matches.length > 0;
 
   React.useEffect(() => setHighlightedIndex(0), [matches]);

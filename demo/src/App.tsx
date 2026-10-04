@@ -1,7 +1,6 @@
 import * as React from "react";
 import maplibregl from "maplibre-gl";
-import type { Feature, Polygon } from "geojson";
-import { ChevronsUpDown, MapPin } from "lucide-react";
+import { ChevronsUpDown, MapPin, Share2 } from "lucide-react";
 
 import {
   getCampusStyle,
@@ -11,12 +10,16 @@ import {
   MAX_ZOOM,
   setBuildingLabelsVisible,
   IITB_BUILDINGS,
-  buildingCentroid,
   findRoutes,
+  inCampusBbox,
   type Route,
   type RoutingProfile,
 } from "../../src/index";
-import { readSharedRoute, writeSharedRoute } from "@/lib/route-url";
+import { readSharedRoute, routeLink, writeSharedRoute, type SharedRoute } from "@/lib/route-url";
+import { buildingPath, buildingSlug, slugFromPathname } from "@/lib/building-url";
+import { encodeDigipin } from "@/lib/digipin";
+import { MARKER_COLORS, MY_LOCATION_LABEL, SITE_TITLE, findBuildingCentroid, formatRouteInfo, resolvePlace } from "@/lib/places";
+import { haversineMeters } from "../../src/routing";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -29,7 +32,6 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { BuildingCombobox } from "@/components/building-combobox";
 
-const MY_LOCATION_LABEL = "My current location";
 const ROUTE_SOURCE_ID = "demo-route";
 const ROUTE_LAYER_ID = "demo-route-line";
 
@@ -37,21 +39,15 @@ const buildingNames = IITB_BUILDINGS.features
   .map((f) => f.properties?.name)
   .filter((name): name is string => !!name);
 
+// Opened via a /b/<slug>/ share page: that building is the destination.
+const sharedBuilding = (() => {
+  const slug = slugFromPathname(window.location.pathname);
+  return slug ? buildingNames.find((name) => buildingSlug(name) === slug) : undefined;
+})();
+
 interface RouteState {
   routes: Route[];
   selectedIndex: number;
-}
-
-function findBuildingCentroid(name: string): [number, number] | undefined {
-  const feature = IITB_BUILDINGS.features.find((f) => f.properties?.name?.toLowerCase() === name.trim().toLowerCase());
-  return feature ? buildingCentroid(feature as Feature<Polygon>) : undefined;
-}
-
-function formatRouteInfo(route: Route, profile: RoutingProfile): string {
-  const km = route.distanceMeters / 1000;
-  const speedKmh = profile === "walk" ? 5 : 20;
-  const minutes = Math.round((km / speedKmh) * 60);
-  return `${km.toFixed(2)} km, ~${minutes} min ${profile === "walk" ? "walking" : "driving"}`;
 }
 
 function toErrorMessage(err: unknown): string {
@@ -94,7 +90,7 @@ function drawRouteLayer(map: maplibregl.Map, routes: Route[], selectedIndex: num
       source: ROUTE_SOURCE_ID,
       layout: { "line-cap": "round", "line-join": "round" },
       paint: {
-        "line-color": ["case", ["get", "selected"], "#2563eb", "#94a3b8"],
+        "line-color": ["case", ["get", "selected"], MARKER_COLORS.route, "#94a3b8"],
         "line-width": ["case", ["get", "selected"], 5, 3],
         "line-opacity": ["case", ["get", "selected"], 0.9, 0.6],
       },
@@ -123,11 +119,22 @@ function LabeledInput({
   );
 }
 
+function DigipinHint({ label, place }: { label: string; place: [number, number] | null | undefined }) {
+  if (!place) return null;
+  return (
+    <p className="-mt-1 px-1 text-xs text-muted-foreground">
+      {label} · DIGIPIN <span className="font-mono select-all">{encodeDigipin(place)}</span>
+    </p>
+  );
+}
+
 export default function App() {
   const mapContainerRef = React.useRef<HTMLDivElement>(null);
   const mapRef = React.useRef<maplibregl.Map | null>(null);
   const fromMarkerRef = React.useRef<maplibregl.Marker | null>(null);
   const toMarkerRef = React.useRef<maplibregl.Marker | null>(null);
+  const geolocateRef = React.useRef<maplibregl.GeolocateControl | null>(null);
+  const lastRoutedFixRef = React.useRef<{ at: [number, number]; to: string } | null>(null);
 
   const [dark, setDark] = React.useState(false);
   const [buildingNamesVisible, setBuildingNamesVisible] = React.useState(true);
@@ -137,11 +144,12 @@ export default function App() {
   const [glyphsUrlDraft, setGlyphsUrlDraft] = React.useState(() => (import.meta.env.DEV ? "/fonts/{fontstack}/{range}.pbf" : ""));
 
   const [fromValue, setFromValue] = React.useState("");
-  const [toValue, setToValue] = React.useState("");
+  const [toValue, setToValue] = React.useState(sharedBuilding ?? "");
   const [myLocation, setMyLocation] = React.useState<[number, number] | null>(null);
   const [profile, setProfile] = React.useState<RoutingProfile>("walk");
   const [routeState, setRouteState] = React.useState<RouteState>({ routes: [], selectedIndex: 0 });
   const [error, setError] = React.useState("");
+  const [linkCopied, setLinkCopied] = React.useState(false);
   const [panelOpen, setPanelOpen] = React.useState(() => window.matchMedia("(min-width: 640px)").matches);
 
   const applyStyleOverrides = () => {
@@ -155,25 +163,49 @@ export default function App() {
     }
   };
 
+  const fromIsMe = fromValue.trim() === MY_LOCATION_LABEL;
+  const toPlace = resolvePlace(toValue);
+  const appBase = new URL(import.meta.env.BASE_URL, window.location.origin);
+  const sharedRoute = (routeIndex: number): SharedRoute => ({ from: fromValue.trim(), to: toValue.trim(), profile, routeIndex });
+
   const pushRouteUrl = (routeIndex: number) => {
-    const url = writeSharedRoute(new URL(window.location.href), {
-      from: fromValue.trim(),
-      to: toValue.trim(),
-      profile,
-      routeIndex,
-    });
-    window.history.pushState(null, "", url);
+    window.history.pushState(null, "", routeLink(appBase, sharedRoute(routeIndex)));
   };
 
-  const computeRoute = (routeIndex: number, pushUrl: boolean) => {
+  // route links use the share Worker when configured, so the preview shows the route
+  const shareUrl = () => {
+    const worker = import.meta.env.VITE_SHARE_URL;
+    if (routeState.routes.length === 0) {
+      return findBuildingCentroid(toValue) ? new URL(buildingPath(toValue.trim()), appBase).href : appBase.href;
+    }
+    const route = sharedRoute(routeState.selectedIndex);
+    return (worker ? writeSharedRoute(new URL("r", worker), route) : routeLink(appBase, route)).href;
+  };
+
+  const shareLink = async () => {
+    const url = shareUrl();
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: `${toValue.trim()} | ${SITE_TITLE}`, url });
+        return;
+      }
+      await navigator.clipboard.writeText(url);
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 2000);
+    } catch (err) {
+      if ((err as Error).name !== "AbortError") setError(`Couldn't share: ${toErrorMessage(err)}`);
+    }
+  };
+
+  const computeRoute = (routeIndex: number, { pushUrl, fit }: { pushUrl: boolean; fit: boolean }) => {
     const map = mapRef.current;
     if (!map) return;
     setError("");
 
-    const from = fromValue.trim() === MY_LOCATION_LABEL && myLocation ? myLocation : findBuildingCentroid(fromValue);
-    const to = findBuildingCentroid(toValue);
+    const from = fromIsMe ? myLocation : resolvePlace(fromValue);
+    const to = toPlace;
     if (!from) {
-      setError(`Unknown "from": ${fromValue}`);
+      setError(fromIsMe ? "Waiting for your location…" : `Unknown "from": ${fromValue}`);
       return;
     }
     if (!to) {
@@ -192,9 +224,10 @@ export default function App() {
     setRouteState({ routes: found, selectedIndex: nextIndex });
     if (pushUrl) pushRouteUrl(nextIndex);
 
-    fromMarkerRef.current = setMarker(map, fromMarkerRef.current, from, "#16a34a");
-    toMarkerRef.current = setMarker(map, toMarkerRef.current, to, "#dc2626");
+    fromMarkerRef.current = setMarker(map, fromMarkerRef.current, from, MARKER_COLORS.start);
+    toMarkerRef.current = setMarker(map, toMarkerRef.current, to, MARKER_COLORS.end);
 
+    if (!fit) return;
     const allCoords = found.flatMap((r) => r.coordinates);
     const bounds = allCoords.reduce(
       (b, c) => b.extend(c as [number, number]),
@@ -206,8 +239,8 @@ export default function App() {
   // Two named entry points instead of one boolean-flag parameter: a fresh user-initiated
   // search always starts at route 0 and updates the URL; a recompute (after a style reload
   // or a shareable-URL restore) keeps whatever route was already selected and doesn't.
-  const searchDirections = () => computeRoute(0, true);
-  const recomputeRoute = () => computeRoute(routeState.selectedIndex, false);
+  const searchDirections = () => computeRoute(0, { pushUrl: true, fit: true });
+  const recomputeRoute = () => computeRoute(routeState.selectedIndex, { pushUrl: false, fit: true });
 
   const clearRoute = () => {
     setRouteState({ routes: [], selectedIndex: 0 });
@@ -233,15 +266,35 @@ export default function App() {
       return;
     }
 
+    const sharedCentroid = sharedBuilding ? findBuildingCentroid(sharedBuilding) : undefined;
     const map = new maplibregl.Map({
       container: mapContainerRef.current,
       style,
-      center: CAMPUS_CENTER,
-      zoom: 16,
+      center: sharedCentroid ?? CAMPUS_CENTER,
+      zoom: sharedCentroid ? 17 : 16,
       minZoom: MIN_ZOOM,
       maxZoom: MAX_ZOOM,
     });
     mapRef.current = map;
+    if (sharedCentroid) toMarkerRef.current = setMarker(map, null, sharedCentroid, MARKER_COLORS.end);
+
+    const geolocate = new maplibregl.GeolocateControl({
+      positionOptions: { enableHighAccuracy: true },
+      trackUserLocation: true,
+    });
+    map.addControl(geolocate, "bottom-right");
+    geolocate.on("geolocate", (pos: GeolocationPosition) => setMyLocation([pos.coords.longitude, pos.coords.latitude]));
+    geolocateRef.current = geolocate;
+    // Auto-track only on campus: off campus the camera would follow the user off the map.
+    map.once("load", () => {
+      navigator.geolocation?.getCurrentPosition(
+        (pos) => {
+          if (inCampusBbox(pos.coords.latitude, pos.coords.longitude)) geolocate.trigger();
+        },
+        () => {}, // denied/unavailable: the control's button still lets the user retry
+        { enableHighAccuracy: true },
+      );
+    });
 
     // `setStyle()` replaces layers, so restore visibility/route on every load. A
     // URL-specified route (from/to populated, not yet resolved into routes) is
@@ -303,6 +356,22 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // live directions from the GPS fix; only the first route fits the camera, so later fixes don't fight panning
+  React.useEffect(() => {
+    if (!myLocation || !inCampusBbox(myLocation[1], myLocation[0]) || !toPlace) return;
+    if (!fromValue.trim()) {
+      setFromValue(MY_LOCATION_LABEL);
+      return;
+    }
+    if (!fromIsMe || !mapRef.current?.isStyleLoaded()) return;
+    // skip GPS jitter; k-shortest-paths is too slow to rerun per fix
+    const last = lastRoutedFixRef.current;
+    if (routeState.routes.length > 0 && last?.to === toValue && haversineMeters(last.at, myLocation) < 10) return;
+    lastRoutedFixRef.current = { at: myLocation, to: toValue };
+    computeRoute(routeState.selectedIndex, { pushUrl: false, fit: routeState.routes.length === 0 });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [myLocation, fromValue, toValue]);
+
   // Service worker registration, production only (avoids fighting Vite's dev HMR).
   React.useEffect(() => {
     if (!import.meta.env.DEV && "serviceWorker" in navigator) {
@@ -312,13 +381,8 @@ export default function App() {
 
   function useMyLocation() {
     setError("");
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setMyLocation([pos.coords.longitude, pos.coords.latitude]);
-        setFromValue(MY_LOCATION_LABEL);
-      },
-      (err) => setError(`Geolocation failed: ${err.message}`),
-    );
+    setFromValue(MY_LOCATION_LABEL);
+    if (!myLocation) geolocateRef.current?.trigger();
   }
 
   return (
@@ -396,7 +460,7 @@ export default function App() {
                   value={fromValue}
                   onValueChange={setFromValue}
                   buildingNames={buildingNames}
-                  placeholder="From (building or my location)"
+                  placeholder="From (building, DIGIPIN, my location)"
                   className="flex-1"
                 />
                 <Button
@@ -414,8 +478,11 @@ export default function App() {
                 value={toValue}
                 onValueChange={setToValue}
                 buildingNames={buildingNames}
-                placeholder="To (building)"
+                placeholder="To (building or DIGIPIN)"
               />
+
+              <DigipinHint label="To" place={toPlace} />
+              {fromIsMe && <DigipinHint label="You" place={myLocation} />}
 
               <ToggleGroup type="single" value={profile} onValueChange={(v) => v && setProfile(v as RoutingProfile)}>
                 <ToggleGroupItem value="walk" className="flex-1">
@@ -426,7 +493,15 @@ export default function App() {
                 </ToggleGroupItem>
               </ToggleGroup>
 
-              <Button onClick={searchDirections}>Get directions</Button>
+              <div className="flex gap-2">
+                <Button className="flex-1" onClick={searchDirections}>
+                  Get directions
+                </Button>
+                <Button variant="outline" onClick={shareLink} disabled={!toPlace}>
+                  <Share2 className="size-4" />
+                  {linkCopied ? "Link copied" : "Share"}
+                </Button>
+              </div>
 
               {routeState.routes.length > 0 && (
                 <ToggleGroup

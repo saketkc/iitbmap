@@ -25,6 +25,9 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run demo:build -- --base=/${{ github.event.repository.name }}/
+        env:
+          # Route share links go through the share Worker (worker/) when this repo variable is set.
+          VITE_SHARE_URL: ${{ vars.SHARE_URL }}
       - uses: actions/configure-pages@v5
         with:
           enablement: true

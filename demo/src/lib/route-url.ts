@@ -1,4 +1,6 @@
 import type { RoutingProfile } from "../../../src/index";
+import { buildingPath } from "./building-url";
+import { findBuilding } from "./places";
 
 export interface SharedRoute {
   from: string;
@@ -17,6 +19,14 @@ export function readSharedRoute(url: URL): SharedRoute | null {
   const routeIndex = Number.isInteger(requestedIndex) && requestedIndex >= 0 ? requestedIndex : 0;
 
   return { from, to, profile, routeIndex };
+}
+
+/** App link for a route, under the destination's /b/<slug>/ page when it's a building. */
+export function routeLink(appBase: string | URL, route: SharedRoute): URL {
+  const url = new URL(appBase);
+  url.search = "";
+  if (findBuilding(route.to)) url.pathname = new URL(buildingPath(route.to.trim()), url).pathname;
+  return writeSharedRoute(url, route);
 }
 
 /** Updates a URL in place, preserving unrelated query parameters and its hash. */

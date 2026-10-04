@@ -15,18 +15,26 @@ export const ATTRIBUTION =
   '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors · ' +
   'basemap style adapted from <a href="https://github.com/marceloprates/prettymaps">prettymaps</a>';
 
-const PALETTE = {
+/** Campus layer colors; also used by link previews. */
+export const PALETTE = {
   light: { green: "#7cb069", parking: "#a8a29e", building: "#57534e", water: "#5b9bd5", line: "#44403c" },
   dark: { green: "#7fb85f", parking: "#7d8291", building: "#c4b9ac", water: "#6cb4e8", line: "#d6d3d1" },
 } as const;
 
-const STREET_WEIGHT: ExpressionSpecification = [
+/** Relative street width by OSM highway tag; also used by link previews. */
+export const STREET_WEIGHTS: Record<string, number> = {
+  motorway: 5, trunk: 5, primary: 4.5, secondary: 4, tertiary: 3.5, cycleway: 3.5,
+  residential: 3, service: 2, unclassified: 2, pedestrian: 2, footway: 1,
+};
+export const DEFAULT_STREET_WEIGHT = 1.5;
+export const BUILDING_OPACITY = 0.9;
+
+// MapLibre's tuple type can't express a spread of label/value pairs, hence the unknown cast.
+const STREET_WEIGHT = [
   "match", ["get", "highway"],
-  "motorway", 5, "trunk", 5, "primary", 4.5, "secondary", 4,
-  "tertiary", 3.5, "cycleway", 3.5, "residential", 3,
-  "service", 2, "unclassified", 2, "pedestrian", 2, "footway", 1,
-  1.5,
-];
+  ...Object.entries(STREET_WEIGHTS).flat(),
+  DEFAULT_STREET_WEIGHT,
+] as unknown as ExpressionSpecification;
 
 const WATERWAY_WEIGHT: ExpressionSpecification = [
   "match", ["get", "waterway"],
@@ -57,7 +65,7 @@ export function campusLayers(dark = false): (FillLayerSpecification | LineLayerS
     },
     {
       id: "campus-building", type: "fill", source: CAMPUS_SOURCE_ID, "source-layer": "building",
-      paint: { "fill-color": c.building, "fill-outline-color": c.line, "fill-opacity": 0.9 },
+      paint: { "fill-color": c.building, "fill-outline-color": c.line, "fill-opacity": BUILDING_OPACITY },
     },
     {
       id: "campus-water", type: "fill", source: CAMPUS_SOURCE_ID, "source-layer": "water",

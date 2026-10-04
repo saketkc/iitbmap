@@ -3,6 +3,7 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { sharePages } from "./demo/share-pages";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -14,7 +15,7 @@ export default defineConfig({
   root: "demo",
   publicDir: "../assets",
   server: { port: 5183 },
-  plugins: [react(), tailwindcss()],
+  plugins: [react(), tailwindcss(), sharePages()],
   resolve: { alias: { "@": path.resolve(__dirname, "demo/src") } },
   build: {
     rollupOptions: {
